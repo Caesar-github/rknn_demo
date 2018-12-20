@@ -61,7 +61,6 @@ int readLines(const char *fileName, char *lines[]){
 }
 
 int loadLabelName(const char* locationFilename, char* labels[]) {
-	printf("ssd - loadLabelName");
 	readLines(locationFilename, labels);
     return 0;
 }
@@ -250,7 +249,7 @@ int postProcessSSD(float * predictions, float *output_classes, int width,
         group->objects[last_count].select.bottom = y2;
         memcpy(group->objects[last_count].name, label, 10);
 
-	//	printf("%s\t@ (%d, %d, %d, %d)\n", label, x1, y1, x2, y2);
+		// printf("%s\t@ (%d, %d, %d, %d)\n", label, x1, y1, x2, y2);
         last_count++;
     }
 
