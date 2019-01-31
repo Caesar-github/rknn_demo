@@ -28,7 +28,7 @@ bo_t g_rga_buf_bo;
 int g_rga_buf_fd;
 char *g_mem_buf;
 rknn_context ctx;
-struct ssd_group g_ssd_group;
+struct ssd_group g_ssd_group[2];
 volatile int send_count;
 
 extern
@@ -61,15 +61,38 @@ static unsigned char *load_model(const char *filename, int *model_size)
 
 static void printRKNNTensor(rknn_tensor_attr *attr)
 {
-    printf("index=%d name=%s n_dims=%d dims=[%d %d %d %d] n_elems=%d size=%d fmt=%d type=%d qnt_type=%d fl=%d zp=%d scale=%f\n", 
-            attr->index, attr->name, attr->n_dims, attr->dims[3], attr->dims[2], attr->dims[1], attr->dims[0], 
+    printf("index=%d name=%s n_dims=%d dims=[%d %d %d %d] n_elems=%d size=%d fmt=%d type=%d qnt_type=%d fl=%d zp=%d scale=%f\n",
+            attr->index, attr->name, attr->n_dims, attr->dims[3], attr->dims[2], attr->dims[1], attr->dims[0],
             attr->n_elems, attr->size, 0, attr->type, attr->qnt_type, attr->fl, attr->zp, attr->scale);
 }
 
+pthread_mutex_t group_mutex;
 
+static int cur_group = 0;
 inline struct ssd_group* ssd_get_ssd_group()
 {
-    return &g_ssd_group;
+
+    return &g_ssd_group[cur_group];
+}
+
+int ssd_group_mutex_init()
+{
+    pthread_mutex_init(&group_mutex, NULL);
+}
+
+int ssd_group_mutex_deinit()
+{
+    pthread_mutex_destroy(&group_mutex);
+}
+
+int ssd_group_mutex_lock()
+{
+    pthread_mutex_lock(&group_mutex);
+}
+
+int ssd_group_mutex_unlock()
+{
+    pthread_mutex_unlock(&group_mutex);
 }
 
 inline float ssd_get_fps()
@@ -222,10 +245,10 @@ int ssd_rknn_process(char* in_data, int w, int h, int c)
     // printf("rknn run time:%0.2ldms\n", runTime2 - runTime1);
 
     long postprocessTime1 = getCurrentTime();
-    rknn_msg_send(output1, output0, w, h, &g_ssd_group);
+    rknn_msg_send(output1, output0, w, h, &g_ssd_group[!cur_group]);
     while(send_count >= 5) {
         printf("sleep now \n");
-        usleep(200);
+        usleep(2000);
     }
     long postprocessTime2 = getCurrentTime();
     send_count++;
@@ -254,7 +277,19 @@ int ssd_post(void *flag)
     while(*(int *)flag) {
         rknn_msg_recv(&predictions, &output_classes, &width, &heigh, (void *)&group);
         send_count--;
+        group = &g_ssd_group[!cur_group];
+        // if (group->count > 0 && group->posted > 0)
+        // {
+        //     if (predictions)
+        //         free(predictions);
+        //     if (output_classes)
+        //         free(output_classes);
+        //     printf("throw data\n");
+        //     cur_group = !cur_group;
+        //     continue;
+        // }
         postProcessSSD(predictions, output_classes, width, heigh, group);
+        cur_group = !cur_group;
         if (predictions)
             free(predictions);
         if (output_classes)

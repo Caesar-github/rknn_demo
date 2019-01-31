@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include <minigui/common.h>
 #include <minigui/minigui.h>
@@ -39,6 +40,14 @@ RECT fps_rect   = {30, 11, 153, 55};
 RECT main_rect1 = {290, 70, 1280, 720};
 RECT main_rect2 = {0, 160, 290, 720};
 
+#define PaintRectBold(func, handle, rect) \
+	            func(handle, ((RECT *)rect)->left, ((RECT *)rect)->top, \
+						                         ((RECT *)rect)->right, ((RECT *)rect)->bottom); \
+            func(handle, ((RECT *)rect)->left - 1, ((RECT *)rect)->top - 1, \
+					                         ((RECT *)rect)->right + 1, ((RECT *)rect)->bottom + 1); \
+            func(handle, ((RECT *)rect)->left + 1, ((RECT *)rect)->top + 1, \
+					                         ((RECT *)rect)->right - 1, ((RECT *)rect)->bottom - 1)
+
 void ssd_paint_object_msg()
 {
     InvalidateRect(g_main_hwnd, &main_rect1, TRUE);
@@ -64,13 +73,17 @@ static int mDrawText(HDC hdc, const char *buf, int n, int left, int top, int rig
 
 static void paint_single_object(HDC hdc, SSDRECT *select, const char *name)
 {
-    FillBoxWithBitmap(hdc, select->left, select->top,
-                      select->right - select->left,
-                      select->bottom - select->top,
-                      &mobilenet_box_bg_9_bmap);
+
+    // FillBoxWithBitmap(hdc, select->left, select->top,
+    //                   select->right - select->left,
+    //                   select->bottom - select->top,
+    //                   &mobilenet_box_bg_9_bmap);
+    SetPenColor(hdc, TEXT_COLOR);
+    PaintRectBold(Rectangle, hdc, select);
     FillBoxWithBitmap(hdc, select->left + RECT_EDGE_SIZE,
                       select->bottom - RECT_EDGE_SIZE -12,
                       8, 12, &dot_ssd_bmap);
+
     TextOut(hdc, select->left + RECT_EDGE_SIZE + 8 + 5,
             select->bottom - RECT_EDGE_SIZE - 12 - 1, name);
 }
@@ -104,6 +117,8 @@ static void paint_object(HDC hdc)
             paint_single_object(hdc, &select, mssd_group->objects[i].name);
         }
     }
+    // mssd_group->posted--;
+    // mssd_group->count = 0;
 }
 
 void ssd_paint_object(HWND hwnd)

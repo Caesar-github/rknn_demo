@@ -33,7 +33,7 @@
 #include "joint_ui.h"
 #endif
 
-#define TEXT_SIZE_MAIN    14
+#define TEXT_SIZE_MAIN    18
 #define _ID_TIMER      106
 
 static HWND g_main_hwnd;
