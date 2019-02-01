@@ -10,7 +10,7 @@
 #include "v4l2camera.h"
 
 #define DEV_NAME      "/dev/video0"
-#define MODEL_NAME    "/usr/share/rknn_demo/ssd_mobilenet_v1_coco.rknn"
+#define MODEL_NAME    "/usr/share/rknn_demo/ssd_inception_v2.rknn"
 
 #define SRC_W         640
 #define SRC_H         480
