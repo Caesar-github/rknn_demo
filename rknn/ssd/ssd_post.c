@@ -4,6 +4,7 @@
 #include "ssd.h"
 #include "ssd_post.h"
 #include "rknn_msg.h"
+#include "tracker/track_c_link_c++.h"
 #define BOX_PRIORS_TXT_PATH "/usr/share/rknn_demo/box_priors.txt"
 #define LABEL_NALE_TXT_PATH "/usr/share/rknn_demo/coco_labels_list.txt"
 
@@ -12,6 +13,10 @@ float NMS_THRESHOLD = 0.45f;
 
 char *labels[NUM_CLASS];
 float box_priors[4][NUM_RESULTS];
+
+#define MAX_OUTPUT_NUM 100
+object_T object_input[MAX_OUTPUT_NUM];
+object_T object_output[MAX_OUTPUT_NUM];
 
 char * readLine(FILE *fp, char *buffer, int *len)
 {
@@ -226,32 +231,85 @@ int postProcessSSD(float * predictions, float *output_classes, int width,
 
     int last_count = 0;
     group->count = 0;
-    /* box valid detect target */
-    for (int i = 0; i < validCount; ++i) {
-        if (output[0][i] == -1) {
-            continue;
-        }
-        int n = output[0][i];
-        int topClassScoreIndex = output[1][i];
+	int track = 1;
+	int maxTrackLifetime = 3;
+	if(!track) {
+        /* box valid detect target */
+	    for (int i = 0; i < validCount; ++i) {
+	        if (output[0][i] == -1) {
+	            continue;
+	        }
+	        int n = output[0][i];
+	        int topClassScoreIndex = output[1][i];
 
-        int x1 = (int)(predictions[n * 4 + 1] * width);
-        int y1 = (int)(predictions[n * 4 + 0] * heigh);
-        int x2 = (int)(predictions[n * 4 + 3] * width);
-        int y2 = (int)(predictions[n * 4 + 2] * heigh);
-        // There are a bug show toothbrush always
-        if (x1 == 0 && x2 == 0 && y1 == 0 && y2 == 0)
-            continue;
-        char *label = labels[topClassScoreIndex];
+	        int x1 = (int)(predictions[n * 4 + 1] * width);
+	        int y1 = (int)(predictions[n * 4 + 0] * heigh);
+	        int x2 = (int)(predictions[n * 4 + 3] * width);
+	        int y2 = (int)(predictions[n * 4 + 2] * heigh);
+	        // There are a bug show toothbrush always
+	        if (x1 == 0 && x2 == 0 && y1 == 0 && y2 == 0)
+	            continue;
+	        char *label = labels[topClassScoreIndex];
 
-        group->objects[last_count].select.left   = x1;
-        group->objects[last_count].select.top    = y1;
-        group->objects[last_count].select.right  = x2;
-        group->objects[last_count].select.bottom = y2;
-        memcpy(group->objects[last_count].name, label, 10);
+	        group->objects[last_count].select.left   = x1;
+	        group->objects[last_count].select.top    = y1;
+	        group->objects[last_count].select.right  = x2;
+	        group->objects[last_count].select.bottom = y2;
+	        memcpy(group->objects[last_count].name, label, 10);
 
-		// printf("%s\t@ (%d, %d, %d, %d)\n", label, x1, y1, x2, y2);
-        last_count++;
-    }
+			//printf("%s\t@ (%d, %d, %d, %d)\n", label, x1, y1, x2, y2);
+	        last_count++;
+	    }
+	}
+	else
+	{
+		int track_num_input = 0;
+		for (int i = 0; i < validCount; ++i) {
+			if (output[0][i] == -1) {
+		        continue;
+		    }
+		    int n = output[0][i];
+		    int topClassScoreIndex = output[1][i];
+
+		    int x1 = (int)(predictions[n * 4 + 1] * width);
+		    int y1 = (int)(predictions[n * 4 + 0] * heigh);
+		    int x2 = (int)(predictions[n * 4 + 3] * width);
+		    int y2 = (int)(predictions[n * 4 + 2] * heigh);
+		    // There are a bug show toothbrush always
+		    if (x1 == 0 && x2 == 0 && y1 == 0 && y2 == 0)
+		        continue;
+			object_input[track_num_input].r.x = x1;
+			object_input[track_num_input].r.y = y1;
+			object_input[track_num_input].r.width = x2 -x1;
+			object_input[track_num_input].r.height = y2 -y1;
+			object_input[track_num_input].obj_class= topClassScoreIndex;
+			track_num_input++;
+		}
+
+		int track_num_output = 0;
+
+		object_track(maxTrackLifetime, track_num_input, object_input, &track_num_output, object_output, width, heigh);
+		for (int i = 0; i < track_num_output; ++i) {
+	        int topClassScoreIndex = object_output[i].obj_class;
+
+	        int x1 = (int)(object_output[i].r.x);
+	        int y1 = (int)(object_output[i].r.y);
+	        int x2 = (int)(object_output[i].r.x +object_output[i].r.width);
+	        int y2 = (int)(object_output[i].r.y +object_output[i].r.height);
+	        // There are a bug show toothbrush always
+	        if (x1 == 0 && x2 == 0 && y1 == 0 && y2 == 0)
+	            continue;
+	        char *label = labels[topClassScoreIndex];
+
+	        group->objects[i].select.left   = x1;
+	        group->objects[i].select.top    = y1;
+	        group->objects[i].select.right  = x2;
+	        group->objects[i].select.bottom = y2;
+	        memcpy(group->objects[i].name, label, 10);
+			//printf("%s\t@ (%d, %d, %d, %d)\n", group->faces[i].name, x1, y1, x2 -x1, y2 -y1);
+	    }
+        last_count = track_num_output;
+	}
 
     group->count = last_count;
 }

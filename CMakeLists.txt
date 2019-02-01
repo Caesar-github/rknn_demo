@@ -22,6 +22,9 @@ if(DEFINED ENABLE_SSD)
   set(RKNN_MODEL_SRC
       rknn/ssd/ssd.c
       rknn/ssd/ssd_post.c
+      rknn/ssd/tracker/objects_tracker.cpp
+      rknn/ssd/tracker/objects_update.cpp
+      rknn/ssd/tracker/track_c_link_c++.cpp
       ui/ssd/ssd_ui.c
     )
 endif(DEFINED ENABLE_SSD)
