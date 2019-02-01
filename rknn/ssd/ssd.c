@@ -2,6 +2,7 @@
 #include <rga/RgaApi.h>
 #include <linux/videodev2.h>
 #include "include/rknn_runtime.h"
+#include "buffer.h"
 #include "rknn_msg.h"
 #include "yuv.h"
 #include "ssd.h"
@@ -31,40 +32,10 @@ rknn_context ctx;
 struct ssd_group g_ssd_group[2];
 volatile int send_count;
 
-extern
-int yuv_draw(char *src_ptr, int src_fd, int format, int src_w, int src_h);
+extern int yuv_draw(char *src_ptr, int src_fd, int format,
+		    int src_w, int src_h);
 extern void ssd_paint_object_msg();
 extern void ssd_paint_fps_msg();
-
-static unsigned char *load_model(const char *filename, int *model_size)
-{
-    FILE *fp = fopen(filename, "rb");
-    if(fp == NULL) {
-        printf("fopen %s fail!\n", filename);
-        return NULL;
-    }
-    fseek(fp, 0, SEEK_END);
-    int model_len = ftell(fp);
-    unsigned char *model = (unsigned char*)malloc(model_len);
-    fseek(fp, 0, SEEK_SET);
-    if(model_len != fread(model, 1, model_len, fp)) {
-        printf("fread %s fail!\n", filename);
-        free(model);
-        return NULL;
-    }
-    *model_size = model_len;
-    if(fp) {
-        fclose(fp);
-    }
-    return model;
-}
-
-static void printRKNNTensor(rknn_tensor_attr *attr)
-{
-    printf("index=%d name=%s n_dims=%d dims=[%d %d %d %d] n_elems=%d size=%d fmt=%d type=%d qnt_type=%d fl=%d zp=%d scale=%f\n",
-            attr->index, attr->name, attr->n_dims, attr->dims[3], attr->dims[2], attr->dims[1], attr->dims[0],
-            attr->n_elems, attr->size, 0, attr->type, attr->qnt_type, attr->fl, attr->zp, attr->scale);
-}
 
 pthread_mutex_t group_mutex;
 
@@ -107,14 +78,6 @@ inline float ssd_get_fps()
     }   \
 } while(0)
 
-
-long getCurrentTime()
-{
-    struct timeval tv;
-    gettimeofday(&tv,NULL);
-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
-}
-
 long cal_fps(float *cal_fps)
 {
     static int count = 0;
@@ -133,52 +96,6 @@ long cal_fps(float *cal_fps)
         *cal_fps = fps;
     }
     ssd_paint_fps_msg();
-}
-
-int ssd_buffer_init(int width, int height, int bpp)
-{
-    int ret = -1;
-
-    ret = c_RkRgaInit();
-    if (ret) {
-        printf("c_RkRgaInit error : %s\n", strerror(errno));
-        return ret;
-    }
-    ret = c_RkRgaGetAllocBuffer(&g_rga_buf_bo, width, height, bpp);
-    if (ret) {
-        printf("c_RkRgaGetAllocBuffer error : %s\n", strerror(errno));
-        return ret;
-    }
-    printf("cur_bo->size = %d\n",g_rga_buf_bo.size);
-    ret = c_RkRgaGetMmap(&g_rga_buf_bo);
-    if (ret) {
-        printf("c_RkRgaGetMmap error : %s\n", strerror(errno));
-        return ret;
-    }
-    ret = c_RkRgaGetBufferFd(&g_rga_buf_bo, &g_rga_buf_fd);
-    if (ret) {
-        printf("c_RkRgaGetBufferFd error : %s\n", strerror(errno));
-        return ret;
-    }
-
-    if (g_mem_buf == NULL) {
-        g_mem_buf = (char *)malloc(width * height * bpp / 8);
-    }
-
-    return ret;
-}
-
-int ssd_buffer_deinit()
-{
-    int ret = -1;
-    printf("func = %s, line = %d\n", __func__, __LINE__);
-    if (g_mem_buf)
-        free(g_mem_buf);
-    close(g_rga_buf_fd);
-    ret = c_RkRgaUnmap(&g_rga_buf_bo);
-    if (ret)
-        printf("c_RkRgaUnmap error : %s\n", strerror(errno));
-    ret = c_RkRgaFree(&g_rga_buf_bo);
 }
 
 int ssd_rknn_process(char* in_data, int w, int h, int c)
@@ -330,7 +247,7 @@ int ssd_run(void *flag)
             printf("rknn_query fail! ret=%d\n", status);
             return -1;
         }
-        printRKNNTensor(&(input_attrs[i]));
+        print_rknn_tensor(&(input_attrs[i]));
     }
 
     printf("output tensors:\n");
@@ -343,7 +260,7 @@ int ssd_run(void *flag)
             printf("rknn_query fail! ret=%d\n", status);
             return -1;
         }
-        printRKNNTensor(&(output_attrs[i]));
+        print_rknn_tensor(&(output_attrs[i]));
     }
 
     // Open Camera and Run
@@ -366,11 +283,17 @@ int ssd_run(void *flag)
 int ssd_init(int arg)
 {
     rknn_msg_init();
-    ssd_buffer_init(DST_W, DST_H, DST_BPP);
+    buffer_init(DST_W, DST_H, DST_BPP, &g_rga_buf_bo,
+		&g_rga_buf_fd);
+
+    if (!g_mem_buf)
+        g_mem_buf = (char *)malloc(DST_W * DST_H * DST_BPP / 8);
 }
 
 int ssd_deinit()
 {
-    ssd_buffer_deinit();
+    if (g_mem_buf)
+        free(g_mem_buf);
+    buffer_deinit(&g_rga_buf_bo, g_rga_buf_fd);
     rknn_msg_deinit();
 }

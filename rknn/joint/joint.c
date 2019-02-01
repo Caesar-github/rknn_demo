@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <rga/RgaApi.h>
 #include <linux/videodev2.h>
+#include "buffer.h"
 #include "include/rknn_runtime.h"
 #include "rknn_msg.h"
 #include "yuv.h"
@@ -47,82 +48,6 @@ inline float *joint_get_joint_group()
         goto final; \
     }   \
 } while(0)
-
-static unsigned char *load_model(const char *filename, int *model_size)
-{
-    FILE *fp = fopen(filename, "rb");
-    if(fp == NULL) {
-        printf("fopen %s fail!\n", filename);
-        return NULL;
-    }
-    fseek(fp, 0, SEEK_END);
-    int model_len = ftell(fp);
-    unsigned char *model = (unsigned char*)malloc(model_len);
-    fseek(fp, 0, SEEK_SET);
-    if(model_len != fread(model, 1, model_len, fp)) {
-        printf("fread %s fail!\n", filename);
-        free(model);
-        return NULL;
-    }
-    *model_size = model_len;
-    if(fp) {
-        fclose(fp);
-    }
-    return model;
-}
-
-long getCurrentTime()
-{
-    struct timeval tv;
-    gettimeofday(&tv,NULL);
-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
-}
-
-int joint_buffer_init(int width, int height, int bpp)
-{
-    int ret = -1;
-
-    ret = c_RkRgaInit();
-    if (ret) {
-        printf("c_RkRgaInit error : %s\n", strerror(errno));
-        return ret;
-    }
-    ret = c_RkRgaGetAllocBuffer(&g_rga_buf_bo, width, height, bpp);
-    if (ret) {
-        printf("c_RkRgaGetAllocBuffer error : %s\n", strerror(errno));
-        return ret;
-    }
-    printf("cur_bo->size = %d\n",g_rga_buf_bo.size);
-    ret = c_RkRgaGetMmap(&g_rga_buf_bo);
-    if (ret) {
-        printf("c_RkRgaGetMmap error : %s\n", strerror(errno));
-        return ret;
-    }
-    ret = c_RkRgaGetBufferFd(&g_rga_buf_bo, &g_rga_buf_fd);
-    if (ret) {
-        printf("c_RkRgaGetBufferFd error : %s\n", strerror(errno));
-        return ret;
-    }
-
-    if (g_mem_buf == NULL) {
-        g_mem_buf = (char *)malloc(width * height * bpp / 8);
-    }
-
-    return ret;
-}
-
-int joint_buffer_deinit()
-{
-    int ret = -1;
-    printf("func = %s, line = %d\n", __func__, __LINE__);
-    if (g_mem_buf)
-        free(g_mem_buf);
-    close(g_rga_buf_fd);
-    ret = c_RkRgaUnmap(&g_rga_buf_bo);
-    if (ret)
-        printf("c_RkRgaUnmap error : %s\n", strerror(errno));
-    ret = c_RkRgaFree(&g_rga_buf_bo);
-}
 
 int joint_rknn_process(char* in_data, int w, int h, int c)
 {
@@ -253,7 +178,7 @@ int joint_run(void *flag)
             printf("rknn_query fail! ret=%d\n", status);
             return -1;
         }
-        printRKNNTensor(&(input_attrs[i]));
+        print_rknn_tensor(&(input_attrs[i]));
     }
 
     printf("output tensors:\n");
@@ -266,7 +191,7 @@ int joint_run(void *flag)
             printf("rknn_query fail! ret=%d\n", status);
             return -1;
         }
-        printRKNNTensor(&(output_attrs[i]));
+        print_rknn_tensor(&(output_attrs[i]));
     }
 
     printf("start camera run\n");
@@ -290,11 +215,17 @@ int joint_run(void *flag)
 int joint_init(int arg)
 {
     rknn_msg_init();
-    joint_buffer_init(DST_W, DST_H, DST_BPP);
+    buffer_init(DST_W, DST_H, DST_BPP, &g_rga_buf_bo,
+		&g_rga_buf_fd);
+
+    if (!g_mem_buf)
+        g_mem_buf = (char *)malloc(DST_W * DST_H * DST_BPP / 8);
 }
 
 int joint_deinit()
 {
-    joint_buffer_deinit();
+    if (g_mem_buf)
+        free(g_mem_buf);
+    buffer_deinit(&g_rga_buf_bo, g_rga_buf_fd);
     rknn_msg_deinit();
 }

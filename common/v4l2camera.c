@@ -62,6 +62,7 @@
 #include <inttypes.h>
 #include <rga/RgaApi.h>
 
+#include "buffer.h"
 #include "config.h"
 #include "v4l2camera.h"
 
@@ -218,16 +219,6 @@ static void imageProcess(void *p, struct timeval time, camera_callback_t callbac
 	// Out input h/w maybe can't fit uvc device, so there maybe changed.
 	if (callback)
 		callback(p, width, height);
-}
-
-/**
-	read single frame
-*/
-static long getCurrentTime()
-{
-    struct timeval tv;
-    gettimeofday(&tv,NULL);
-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
 static int frameRead(camera_callback_t callback)

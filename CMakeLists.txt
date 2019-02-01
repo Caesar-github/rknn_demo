@@ -12,6 +12,7 @@ set(RKNN_DEMO_SRC
       common/rknn_msg.c
       common/v4l2camera.c
       common/yuv.c
+      common/buffer.c
       ui/ui_res.c
     )
 
