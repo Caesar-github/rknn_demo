@@ -6,6 +6,7 @@ include_directories(.)
 include_directories(./include)
 include_directories(./common)
 include_directories(./ui)
+include_directories(./rknn/rknn_api)
 
 set(RKNN_DEMO_SRC
       rknn_camera.c
@@ -16,17 +17,26 @@ set(RKNN_DEMO_SRC
       ui/ui_res.c
     )
 
+add_definitions(-DNEED_RKNNAPI=${NEED_RKNNAPI})
+if(NEED_RKNNAPI)
+    include_directories(./rknn/ssd/ssd_3399pro)
+    set(RKNNAPI_SRC rknn/ssd/ssd_3399pro/ssd.c
+        rknn/ssd/ssd_3399pro/ssd_post.c)
+else(NEED_RKNNAPI)
+    include_directories(./rknn/ssd/ssd_1808)
+    set(RKNNAPI_SRC rknn/ssd/ssd_1808/ssd.c
+        rknn/ssd/ssd_1808/ssd_post.c)
+endif(NEED_RKNNAPI)
+
 if(DEFINED ENABLE_SSD)
   add_definitions(-DENABLE_SSD=${ENABLE_SSD})
-  include_directories(./rknn/ssd)
   include_directories(./ui/ssd)
   set(RKNN_MODEL_SRC
-      rknn/ssd/ssd.c
-      rknn/ssd/ssd_post.c
       rknn/ssd/tracker/objects_tracker.cpp
       rknn/ssd/tracker/objects_update.cpp
       rknn/ssd/tracker/track_c_link_c++.cpp
       ui/ssd/ssd_ui.c
+      ${RKNNAPI_SRC}
     )
 endif(DEFINED ENABLE_SSD)
 
@@ -46,7 +56,13 @@ set (RKNPU_PATH ${CMAKE_SOURCE_DIR}/../../../../../external/rknpu)
 include_directories(${RKNPU_PATH}/rknn/)
 LINK_DIRECTORIES(${RKNPU_PATH}/rknn/)
 
-link_libraries("librknn_runtime.so")
+if(DEFINED NEED_RKNNAPI)
+	if(NEED_RKNNAPI)
+		link_libraries("librknn_api.so")
+	else(NEED_RKNNAPI)
+		link_libraries("librknn_runtime.so")
+	endif(NEED_RKNNAPI)
+endif(DEFINED NEED_RKNNAPI)
 link_libraries("libv4l2.so")
 link_libraries("libjpeg.so")
 link_libraries("libm.so")
