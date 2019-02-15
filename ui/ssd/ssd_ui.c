@@ -14,8 +14,17 @@
 
 #define DST_W             300
 #define DST_H             300
+#if NEED_RKNNAPI
+#define DISP_W            2048
+#define DISP_H            1536
+#define TEXT_OUT_OFF      30
+#define LOGO_OFF          1840
+#else
 #define DISP_W            1280
 #define DISP_H            720
+#define TEXT_OUT_OFF      12
+#define LOGO_OFF          1050
+#endif
 
 #define CAPTION_H         70
 #define RECT_EDGE_SIZE    20
@@ -37,8 +46,13 @@ static WNDPROC old_fps_proc;
 static WNDPROC old_caption_proc;
 
 RECT fps_rect   = {30, 11, 153, 55};
+#if NEED_RKNNAPI
+RECT main_rect1 = {290, 70, 2048, 1536};
+RECT main_rect2 = {0, 160, 290, 1536};
+#else
 RECT main_rect1 = {290, 70, 1280, 720};
 RECT main_rect2 = {0, 160, 290, 720};
+#endif
 
 #define PaintRectBold(func, handle, rect) \
 	            func(handle, ((RECT *)rect)->left, ((RECT *)rect)->top, \
@@ -85,7 +99,7 @@ static void paint_single_object(HDC hdc, SSDRECT *select, const char *name)
                       8, 12, &dot_ssd_bmap);
 
     TextOut(hdc, select->left + RECT_EDGE_SIZE + 8 + 5,
-            select->bottom - RECT_EDGE_SIZE - 12 - 1, name);
+            select->bottom - RECT_EDGE_SIZE - TEXT_OUT_OFF - 1, name);
 }
 
 static void paint_object(HDC hdc)
@@ -138,7 +152,7 @@ static LRESULT caption_wnd_proc(HWND hwnd, UINT message, WPARAM w_param, LPARAM 
     switch(message){
     case MSG_CREATE:
         hdc = BeginPaint (hwnd);
-        FillBoxWithBitmap(hdc, 1050, 11, 200, 48, &img_logo_bmap);
+        FillBoxWithBitmap(hdc, LOGO_OFF, 11, 200, 48, &img_logo_bmap);
         SelectFont (hdc, g_caption_font);
         SetBkColor (hdc, CAPTION_BKCOLOR);
         SetTextColor(hdc, TEXT_COLOR);

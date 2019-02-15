@@ -168,7 +168,7 @@ void rknn_msg_deinit()
 	return ipcmsg_deinit(RKNN_IPCMSGKEY, &g_rknn_msgid);
 }
 
-int rknn_msg_send(float * predictions, float *output_classes,
+int rknn_msg_send(void * predictions, void *output_classes,
 	              int width, int heigh, void *group)
 {
 	RKNN_MSG m_msg;
@@ -180,7 +180,7 @@ int rknn_msg_send(float * predictions, float *output_classes,
 	return ipcmsg_send(&m_msg);
 }
 
-int rknn_msg_recv(float ** predictions, float **output_classes,
+int rknn_msg_recv(void ** predictions, void **output_classes,
 	              int *width, int *heigh, void **group)
 {
 	RKNN_MSG m_msg;

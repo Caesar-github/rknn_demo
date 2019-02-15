@@ -1,16 +1,21 @@
 #include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <rga/RgaApi.h>
 #include <linux/videodev2.h>
-#include "buffer.h"
+#include "rknn_api.h"
 #include "rknn_msg.h"
 #include "yuv.h"
 #include "ssd.h"
 #include "ssd_post.h"
 #include "v4l2camera.h"
-#include "rknn_api.h"
+#include "buffer.h"
 
-#define DEV_NAME      "/dev/video0"
-#define MODEL_NAME    "/usr/share/rknn_demo/ssd_inception_v2.rknn"
+#define DEV_NAME      "/dev/video8"
+#define MODEL_NAME    "/usr/share/rknn_demo/mobilenet_ssd.rknn"
 
 #define SRC_W         640
 #define SRC_H         480
@@ -32,38 +37,14 @@ rknn_context ctx;
 struct ssd_group g_ssd_group[2];
 volatile int send_count;
 
-extern int yuv_draw(char *src_ptr, int src_fd, int format,
-		    int src_w, int src_h);
+extern int yuv_draw(char *src_ptr, int src_fd, int format, int src_w, int src_h);
 extern void ssd_paint_object_msg();
 extern void ssd_paint_fps_msg();
-
-pthread_mutex_t group_mutex;
 
 static int cur_group = 0;
 inline struct ssd_group* ssd_get_ssd_group()
 {
-
     return &g_ssd_group[cur_group];
-}
-
-int ssd_group_mutex_init()
-{
-    pthread_mutex_init(&group_mutex, NULL);
-}
-
-int ssd_group_mutex_deinit()
-{
-    pthread_mutex_destroy(&group_mutex);
-}
-
-int ssd_group_mutex_lock()
-{
-    pthread_mutex_lock(&group_mutex);
-}
-
-int ssd_group_mutex_unlock()
-{
-    pthread_mutex_unlock(&group_mutex);
 }
 
 inline float ssd_get_fps()
@@ -98,78 +79,66 @@ long cal_fps(float *cal_fps)
     ssd_paint_fps_msg();
 }
 
+rknn_input inputs[1];
+//rknn_output outputs[2];
+rknn_tensor_attr outputs_attr[2];
+int postProcessSSD(rknn_output *outputs,
+                   rknn_tensor_attr *outputs_attr,
+                   struct ssd_group *group, int ctx, int w, int h);
 int ssd_rknn_process(char* in_data, int w, int h, int c)
 {
-    int status = 0;
-    int in_size;
-    int out_size0;
-    int out_size1;
-    float *out_data0 = NULL;
-    float *out_data1 = NULL;
-  //   printf("camera callback w=%d h=%d c=%d\n", w, h, c);
+    int ret;
+    int out_fd;
+    const int input_index = 0;
+    const int output_elems1 = NUM_RESULTS * 4;
+    const uint32_t output_size1 = output_elems1 * sizeof(float);
+    const int output_index1 = 0;    // node name "concat"
+
+    const int output_elems2 = NUM_RESULTS * NUM_CLASSES;
+    const uint32_t output_size2 = output_elems2 * sizeof(float);
+    const int output_index2 = 1;    // node name "concat_1"
     cal_fps(&g_fps);
 
-    long runTime1 = getCurrentTime();
-
-    long setinputTime1 = getCurrentTime();
-    // Set Input Data
-    rknn_input inputs[1];
-    memset(inputs, 0, sizeof(inputs));
-    inputs[0].index = 0;
-    inputs[0].type = RKNN_TENSOR_UINT8;
-    inputs[0].size = w*h*c/8;
-    inputs[0].fmt = RKNN_TENSOR_NHWC;
+    inputs[0].index = input_index;
     inputs[0].buf = in_data;
-
-    status = rknn_inputs_set(ctx, 1, inputs);
-    if(status < 0) {
-        printf("rknn_input_set fail! ret=%d\n", status);
-        return -1;
-    }
-    long setinputTime2 = getCurrentTime();
-
-    // printf("set input time:%0.2ldms\n", setinputTime2-setinputTime1);
-
-    status = rknn_run(ctx, NULL);
-    if(status < 0) {
-        printf("rknn_run fail! ret=%d\n", status);
-        return -1;
+    inputs[0].size = w * h * c / 8;
+    inputs[0].pass_through = false;
+    inputs[0].type = RKNN_TENSOR_UINT8;
+    inputs[0].fmt = RKNN_TENSOR_NHWC;
+    ret = rknn_inputs_set(ctx, 1, inputs);
+    if(ret < 0) {
+        printf("rknn_input_set fail! ret=%d\n", ret);
+        return ret;
     }
 
-    // Get Output
-    rknn_output outputs[2];
-    memset(outputs, 0, sizeof(outputs));
-    outputs[0].want_float = 1;
-    outputs[1].want_float = 1;
-    status = rknn_outputs_get(ctx, 2, outputs, NULL);
-    if(status < 0) {
-        printf("rknn_outputs_get fail! ret=%d\n", status);
-        return -1;
+    ret = rknn_run(ctx, NULL);
+    if (ret < 0) {
+        printf("run ret = %d\n", ret);
+        return ret;
     }
 
-    int out0_elem_num = NUM_RESULTS * NUM_CLASS;
-    int out1_elem_num = NUM_RESULTS * 4;
+    rknn_output * outputs = (rknn_output *)calloc(2, sizeof(rknn_output));
+    outputs->want_float = true;
+    outputs->is_prealloc = false;
+    (outputs + 1)->want_float = true;
+    (outputs + 1)->is_prealloc = false;
+    ret = rknn_outputs_get(ctx, 2, outputs, NULL);
+    if (ret < 0) {
+        printf("output ret = %d\n", ret);
+        return ret;
+    }
+    if(outputs->size != outputs_attr[0].n_elems*sizeof(float) || (outputs + 1)->size != outputs_attr[1].n_elems*sizeof(float))
+    {
+        printf("rknn_outputs_get fail! get outputs_size = [%d, %d], but expect [%d, %d]!\n",
+                outputs->size, (outputs + 1)->size, outputs_attr[0].size, outputs_attr[1].size);
+            return -1;
+    }
 
-    float *output0 = malloc(out0_elem_num*sizeof(float));
-    float *output1 = malloc(out1_elem_num*sizeof(float));
-
-    memcpy(output0, outputs[0].buf, out0_elem_num*sizeof(float));
-    memcpy(output1, outputs[1].buf, out1_elem_num*sizeof(float));
-
-    rknn_outputs_release(ctx, 2, outputs);
-
-    long runTime2 = getCurrentTime();
-    // printf("rknn run time:%0.2ldms\n", runTime2 - runTime1);
-
-    long postprocessTime1 = getCurrentTime();
-    rknn_msg_send(output1, output0, w, h, &g_ssd_group[!cur_group]);
+    rknn_msg_send((void *)outputs, (void *)outputs_attr, w, h, &g_ssd_group[cur_group]);
     while(send_count >= 5) {
-        printf("sleep now \n");
-        usleep(2000);
+          printf("sleep now\n");
+          usleep(200);
     }
-    long postprocessTime2 = getCurrentTime();
-    send_count++;
-    // printf("post process time:%0.2ldms\n", postprocessTime2 - postprocessTime1);
 }
 
 void ssd_camera_callback(void *p, int w, int h)
@@ -177,9 +146,18 @@ void ssd_camera_callback(void *p, int w, int h)
     unsigned char* srcbuf = (unsigned char *)p;
     // Send camera data to minigui layer
     yuv_draw(srcbuf, 0, SRC_RKRGA_FMT, w, h);
+
     YUV420toRGB24_RGA(SRC_RKRGA_FMT, srcbuf, w, h,
                       DST_RKRGA_FMT, g_rga_buf_fd, DST_W, DST_H);
+
     memcpy(g_mem_buf, g_rga_buf_bo.ptr, DST_W * DST_H * DST_BPP / 8);
+
+    // static FILE *fp = NULL;
+    // if (fp == NULL) {
+    //     fp = fopen("/tmp/test.rgb", "w+");
+    //     fwrite(g_mem_buf, 1, DST_W * DST_H * DST_BPP / 8, fp);
+    //     fclose(fp);
+    // }
     ssd_rknn_process(g_mem_buf, DST_W, DST_H, DST_BPP);
 }
 
@@ -187,105 +165,65 @@ int ssd_post(void *flag)
 {
     int width;
     int heigh;
-    float *predictions;
-    float *output_classes;
+    rknn_output *outputs;
+    rknn_tensor_attr *outputs_attr;
     struct ssd_group *group;
 
     while(*(int *)flag) {
-        rknn_msg_recv(&predictions, &output_classes, &width, &heigh, (void *)&group);
+        rknn_msg_recv((void **)&outputs, (void **)&outputs_attr, &width, &heigh, (void *)&group);
         send_count--;
         group = &g_ssd_group[!cur_group];
-        // if (group->count > 0 && group->posted > 0)
-        // {
-        //     if (predictions)
-        //         free(predictions);
-        //     if (output_classes)
-        //         free(output_classes);
-        //     printf("throw data\n");
-        //     cur_group = !cur_group;
-        //     continue;
-        // }
-        postProcessSSD(predictions, output_classes, width, heigh, group);
+        postProcessSSD(outputs, outputs_attr, group, ctx, width, heigh);
         cur_group = !cur_group;
-        if (predictions)
-            free(predictions);
-        if (output_classes)
-            free(output_classes);
+        rknn_outputs_release(ctx, 2, outputs);
+        free(outputs);
         ssd_paint_object_msg();
     }
 }
 
 int ssd_run(void *flag)
 {
-    int status = 0;
+    int len;
+    int ret = 0;
+    void *model= NULL;
 
-    // Init
-    int model_len = 0;
-    unsigned char* model = load_model(MODEL_NAME, &model_len);
-    status = rknn_init(&ctx, model, model_len, 0);
-    if(status < 0) {
-        printf("rknn_init fail! ret=%d\n", status);
-        return -1;
+    model = load_model(MODEL_NAME, &len);
+    if (model == NULL)
+        goto final;
+    printf("read model:%s, len:%d\n", MODEL_NAME, len);
+    ret = rknn_init(&ctx, model, len, RKNN_FLAG_PRIOR_MEDIUM);
+    if (ret < 0) {
+        printf("int error = %s\n", strerror(errno));
+        goto final;
     }
 
-    // Get Model Input Output Info
-    rknn_input_output_num io_num;
-    status = rknn_query(ctx, RKNN_QUERY_IN_OUT_NUM, &io_num, sizeof(io_num));
-    if (status != RKNN_SUCC) {
-        printf("rknn_query fail! ret=%d\n", status);
-        return -1;
-    }
-    printf("model input num: %d, output num: %d\n", io_num.n_input, io_num.n_output);
-
-    printf("input tensors:\n");
-    rknn_tensor_attr input_attrs[io_num.n_input];
-    memset(input_attrs, 0, sizeof(input_attrs));
-    for (int i = 0; i < io_num.n_input; i++) {
-        input_attrs[i].index = i;
-        status = rknn_query(ctx, RKNN_QUERY_INPUT_ATTR, &(input_attrs[i]), sizeof(rknn_tensor_attr));
-        if (status != RKNN_SUCC) {
-            printf("rknn_query fail! ret=%d\n", status);
-            return -1;
-        }
-        print_rknn_tensor(&(input_attrs[i]));
+    outputs_attr[0].index = 0;
+    ret = rknn_query(ctx, RKNN_QUERY_OUTPUT_ATTR, &(outputs_attr[0]), sizeof(outputs_attr[0]));
+    if(ret < 0) {
+        printf("rknn_query fail! ret=%d\n", ret);
+        goto final;
     }
 
-    printf("output tensors:\n");
-    rknn_tensor_attr output_attrs[io_num.n_output];
-    memset(output_attrs, 0, sizeof(output_attrs));
-    for (int i = 0; i < io_num.n_output; i++) {
-        output_attrs[i].index = i;
-        status = rknn_query(ctx, RKNN_QUERY_OUTPUT_ATTR, &(output_attrs[i]), sizeof(rknn_tensor_attr));
-        if (status != RKNN_SUCC) {
-            printf("rknn_query fail! ret=%d\n", status);
-            return -1;
-        }
-        print_rknn_tensor(&(output_attrs[i]));
+    outputs_attr[1].index = 1;
+    ret = rknn_query(ctx, RKNN_QUERY_OUTPUT_ATTR, &(outputs_attr[1]), sizeof(outputs_attr[1]));
+    if(ret < 0) {
+        printf("rknn_query fail! ret=%d\n", ret);
+        goto final;
     }
 
-    // Open Camera and Run
     cameraRun(DEV_NAME, SRC_W, SRC_H, SRC_FPS, SRC_V4L2_FMT,
               ssd_camera_callback, (int*)flag);
 
-    printf("exit cameraRun\n");
-
-    // Release
-    if(model) {
-        free(model);
-    }
-    if(ctx > 0) {
-        rknn_destroy(ctx);
-    }
-    return status;
+final:
+    rknn_destroy(ctx);
+    free(model);
+    return ret;
 }
-
 
 int ssd_init(int arg)
 {
     rknn_msg_init();
-    buffer_init(DST_W, DST_H, DST_BPP, &g_rga_buf_bo,
-		&g_rga_buf_fd);
-
+    buffer_init(DST_W, DST_H, DST_BPP, &g_rga_buf_bo, &g_rga_buf_fd);
     if (!g_mem_buf)
         g_mem_buf = (char *)malloc(DST_W * DST_H * DST_BPP / 8);
 }

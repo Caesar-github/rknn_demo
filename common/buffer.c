@@ -33,12 +33,12 @@ long getCurrentTime(void)
     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-void print_rknn_tensor(rknn_tensor_attr *attr)
-{
-    printf("index=%d name=%s n_dims=%d dims=[%d %d %d %d] n_elems=%d size=%d fmt=%d type=%d qnt_type=%d fl=%d zp=%d scale=%f\n",
-            attr->index, attr->name, attr->n_dims, attr->dims[3], attr->dims[2], attr->dims[1], attr->dims[0],
-            attr->n_elems, attr->size, 0, attr->type, attr->qnt_type, attr->fl, attr->zp, attr->scale);
-}
+// void print_rknn_tensor(rknn_tensor_attr *attr)
+// {
+//     printf("index=%d name=%s n_dims=%d dims=[%d %d %d %d] n_elems=%d size=%d fmt=%d type=%d qnt_type=%d fl=%d zp=%d scale=%f\n",
+//             attr->index, attr->name, attr->n_dims, attr->dims[3], attr->dims[2], attr->dims[1], attr->dims[0],
+//             attr->n_elems, attr->size, 0, attr->type, attr->qnt_type, attr->fl, attr->zp, attr->scale);
+// }
 
 int buffer_init(int width, int height, int bpp, bo_t *g_rga_buf_bo,
 		int *g_rga_buf_fd)

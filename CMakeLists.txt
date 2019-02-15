@@ -7,7 +7,7 @@ include_directories(./include)
 include_directories(./common)
 include_directories(./ui)
 include_directories(./rknn/rknn_api)
-
+include_directories(./rknn/ssd)
 set(RKNN_DEMO_SRC
       rknn_camera.c
       common/rknn_msg.c
@@ -21,7 +21,7 @@ add_definitions(-DNEED_RKNNAPI=${NEED_RKNNAPI})
 if(NEED_RKNNAPI)
     include_directories(./rknn/ssd/ssd_3399pro)
     set(RKNNAPI_SRC rknn/ssd/ssd_3399pro/ssd.c
-        rknn/ssd/ssd_3399pro/ssd_post.c)
+        rknn/ssd/ssd_3399pro/ssd_post.cpp)
 else(NEED_RKNNAPI)
     include_directories(./rknn/ssd/ssd_1808)
     set(RKNNAPI_SRC rknn/ssd/ssd_1808/ssd.c

@@ -162,7 +162,7 @@ int ssd_rknn_process(char* in_data, int w, int h, int c)
     // printf("rknn run time:%0.2ldms\n", runTime2 - runTime1);
 
     long postprocessTime1 = getCurrentTime();
-    rknn_msg_send(output1, output0, w, h, &g_ssd_group[!cur_group]);
+    rknn_msg_send((void *)output1, (void *)output0, w, h, &g_ssd_group[!cur_group]);
     while(send_count >= 5) {
         printf("sleep now \n");
         usleep(2000);
@@ -192,7 +192,7 @@ int ssd_post(void *flag)
     struct ssd_group *group;
 
     while(*(int *)flag) {
-        rknn_msg_recv(&predictions, &output_classes, &width, &heigh, (void *)&group);
+        rknn_msg_recv((void **)&predictions, (void **)&output_classes, &width, &heigh, (void *)&group);
         send_count--;
         group = &g_ssd_group[!cur_group];
         // if (group->count > 0 && group->posted > 0)
@@ -247,7 +247,7 @@ int ssd_run(void *flag)
             printf("rknn_query fail! ret=%d\n", status);
             return -1;
         }
-        print_rknn_tensor(&(input_attrs[i]));
+       //print_rknn_tensor(&(input_attrs[i]));
     }
 
     printf("output tensors:\n");
@@ -260,7 +260,7 @@ int ssd_run(void *flag)
             printf("rknn_query fail! ret=%d\n", status);
             return -1;
         }
-        print_rknn_tensor(&(output_attrs[i]));
+        //print_rknn_tensor(&(output_attrs[i]));
     }
 
     // Open Camera and Run
