@@ -301,14 +301,14 @@ int postProcessSSD(float * predictions, float *output_classes, int width,
 	            continue;
 	        char *label = labels[topClassScoreIndex];
 
-	        group->objects[i].select.left   = x1;
-	        group->objects[i].select.top    = y1;
-	        group->objects[i].select.right  = x2;
-	        group->objects[i].select.bottom = y2;
-	        memcpy(group->objects[i].name, label, 10);
+	        group->objects[last_count].select.left   = x1;
+	        group->objects[last_count].select.top    = y1;
+	        group->objects[last_count].select.right  = x2;
+	        group->objects[last_count].select.bottom = y2;
+	        memcpy(group->objects[last_count].name, label, 10);
+	        last_count++;
 			//printf("%s\t@ (%d, %d, %d, %d)\n", group->faces[i].name, x1, y1, x2 -x1, y2 -y1);
 	    }
-        last_count = track_num_output;
 	}
 
     group->count = last_count;
