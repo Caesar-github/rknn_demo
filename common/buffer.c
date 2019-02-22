@@ -1,6 +1,9 @@
-#include <stdio.h>
-#include <rga/RgaApi.h>
 #include "buffer.h"
+
+#include <stdio.h>
+#include <sys/time.h>
+
+extern int c_RkRgaFree(bo_t *bo_info);
 
 unsigned char *load_model(const char *filename, int *model_size)
 {

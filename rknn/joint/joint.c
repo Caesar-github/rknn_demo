@@ -2,7 +2,7 @@
 #include <rga/RgaApi.h>
 #include <linux/videodev2.h>
 #include "buffer.h"
-#include "include/rknn_runtime.h"
+#include "rknn_runtime.h"
 #include "rknn_msg.h"
 #include "yuv.h"
 #include "joint.h"

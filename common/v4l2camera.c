@@ -104,7 +104,7 @@ static unsigned int width = 640;
 static unsigned int height = 480;
 static unsigned int fps = 30;
 static unsigned int format = V4L2_PIX_FMT_YUV420;
-static int continuous = 0;
+static int continuous = 1;
 static unsigned char jpegQuality = 70;
 static char* jpegFilename = NULL;
 static char* jpegFilenamePart = NULL;
@@ -368,6 +368,10 @@ static void mainLoop(camera_callback_t callback, int *flag)
 
 		frameRead(callback);
 		/* EAGAIN - continue select loop. */
+
+		if (continuous == 0) {
+			*flag = 0;
+		}
 	}
 }
 

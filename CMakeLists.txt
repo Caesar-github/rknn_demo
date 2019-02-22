@@ -51,10 +51,28 @@ if(DEFINED ENABLE_JOINT)
   )
 endif(DEFINED ENABLE_JOINT)
 
+if(DEFINED ENABLE_FRG)
+  add_definitions(-DENABLE_FRG=${ENABLE_FRG})
+  include_directories(./rknn/frg)
+  include_directories(./ui/frg)
+  set(RKNN_MODEL_SRC
+    rknn/frg/frg.c
+    ui/frg/frg_ui.c
+  )
+  set(RKNN_RES_FILES
+      rknn/frg/frgsdk_rk1808/model/align.rknn
+      rknn/frg/frgsdk_rk1808/model/detect.rknn
+      rknn/frg/frgsdk_rk1808/model/recognize.rknn)
+  link_libraries("${CMAKE_SOURCE_DIR}/rknn/frg/frgsdk_rk1808/so_file/librkfacerecg.so"
+                 "${CMAKE_SOURCE_DIR}/rknn/frg/frgsdk_rk1808/so_file/libopencv_core.so"
+                 "${CMAKE_SOURCE_DIR}/rknn/frg/frgsdk_rk1808/so_file/libopencv_imgproc.so")
+endif()
+
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fsanitize=address -fsanitize-recover=address -static-libasan")
+
 # import rknn
-set (RKNPU_PATH ${CMAKE_SOURCE_DIR}/../../../../../external/rknpu)
-include_directories(${RKNPU_PATH}/rknn/)
-LINK_DIRECTORIES(${RKNPU_PATH}/rknn/)
+set(RKNPU_PATH ${CMAKE_SOURCE_DIR}/../../../../../external/rknpu)
+include_directories(${RKNPU_PATH}/rknn/include)
 
 if(DEFINED NEED_RKNNAPI)
 	if(NEED_RKNNAPI)
@@ -74,3 +92,24 @@ link_libraries("librga.so")
 link_libraries("libfreetype.so")
 
 add_executable(rknn_demo ${RKNN_DEMO_SRC} ${RKNN_MODEL_SRC})
+
+if (RKNN_RES_FILES)
+install(FILES ${RKNN_RES_FILES} DESTINATION share/rknn_demo)
+endif()
+
+if (DEFINED ENABLE_FRG)
+install(FILES rknn/frg/frgsdk_rk1808/so_file/librkfacerecg.so DESTINATION lib)
+install(FILES rknn/frg/frgsdk_rk1808/so_file/libopencv_core.so
+        DESTINATION lib
+        RENAME libopencv_core.so.3.4)
+install(FILES rknn/frg/frgsdk_rk1808/so_file/libopencv_imgproc.so
+        DESTINATION lib
+        RENAME libopencv_imgproc.so.3.4)
+install(FILES rknn/frg/frgsdk_rk1808/box_priors.txt DESTINATION bin)
+install(FILES rknn/frg/start_rknn_frg.sh DESTINATION bin)
+endif()
+
+install(FILES minigui/MiniGUI.cfg DESTINATION ../etc)
+install(DIRECTORY minigui DESTINATION local/share)
+
+install(TARGETS rknn_demo RUNTIME DESTINATION bin)

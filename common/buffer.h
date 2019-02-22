@@ -1,6 +1,9 @@
 #ifndef __BUFFER_H__
 #define __BUFFER_H__
 
+#include "rknn_runtime.h"
+#include <rga/RgaApi.h>
+
 unsigned char *load_model(const char *filename, int *model_size);
 long getCurrentTime(void);
 //void print_rknn_tensor(rknn_tensor_attr *attr);

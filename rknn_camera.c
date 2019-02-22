@@ -33,6 +33,11 @@
 #include "joint_ui.h"
 #endif
 
+#if ENABLE_FRG
+#include "frg.h"
+#include "frg_ui.h"
+#endif
+
 #define TEXT_SIZE_MAIN    18
 #define _ID_TIMER      106
 
@@ -44,10 +49,9 @@ typedef int (*paint_callback_t)(HWND hwnd);
 paint_callback_t g_paint_callback_func;
 typedef int (*rknn_callback_t)(void *arg);
 
-int g_post_flag;
-int g_run_flag;
-pthread_t g_run_tid;
-pthread_t g_post_tid;
+static int g_run_flag = 1;
+static pthread_t g_run_tid = 0;
+static pthread_t g_post_tid = 0;
 
 int rknn_reg_paint_callback(paint_callback_t func)
 {
@@ -63,7 +67,6 @@ void *rknn_run_pth(void *arg)
 {
     rknn_callback_t run_func = (rknn_callback_t)arg;
     if (run_func) {
-        g_run_flag = 1;
         // If the flag be set to 0, phread need end self.
         run_func((void *)&g_run_flag);
     }
@@ -92,9 +95,8 @@ void *rknn_post_pth(void *arg)
 {
     rknn_callback_t post_func = (rknn_callback_t)arg;
     if (post_func) {
-        g_post_flag = 1;
         // If the flag be set to 0, phread need end self.
-        post_func((void *)&g_post_flag);
+        post_func((void *)&g_run_flag);
     }
     pthread_exit(0);
 }
@@ -112,7 +114,7 @@ int rknn_post_pth_create(rknn_callback_t func)
 int rknn_post_pth_destory()
 {
     if (g_post_tid) {
-        g_post_flag = 0;
+        g_run_flag = 0;
         pthread_join(g_post_tid, NULL);
         g_post_tid = 0;
     }
@@ -132,6 +134,12 @@ int rknn_child_win_init(HWND hwnd)
     ret = joint_ui_init(hwnd);
     assert(!ret);
 #endif
+
+#if ENABLE_FRG
+    rknn_reg_paint_callback(frg_paint_object);
+    ret = frg_ui_init(hwnd);
+    assert(!ret);
+#endif
 }
 
 int rknn_child_win_deinit(HWND hwnd)
@@ -141,6 +149,10 @@ int rknn_child_win_deinit(HWND hwnd)
 #endif
 #if ENABLE_JOINT
     joint_ui_deinit(hwnd);
+#endif
+
+#if ENABLE_FRG
+    frg_ui_deinit(hwnd);
 #endif
 }
 
@@ -158,6 +170,11 @@ int rknn_demo_init()
     post = joint_post;
     run = joint_run;
 #endif
+#if ENABLE_FRG
+    frg_init(0);
+    post = frg_post;
+    run = frg_run;
+#endif
     rknn_post_pth_create(post);
     rknn_run_pth_create(run);
 }
@@ -169,6 +186,9 @@ int rknn_demo_deinit()
 #endif
 #if ENABLE_JOINT
     joint_deinit();
+#endif
+#if ENABLE_FRG
+    frg_deinit();
 #endif
     rknn_run_pth_destory();
     rknn_post_pth_destory();
@@ -246,9 +266,8 @@ int rknn_ui_show()
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-
+    printf("exit minigui loop\n");
     rknn_child_win_deinit(g_main_hwnd);
-
     DestroyLogFont(g_main_font);
     DestroyMainWindow(g_main_hwnd);
     MainWindowThreadCleanup(g_main_hwnd);
@@ -261,4 +280,6 @@ int MiniGUIMain(int argc, const char* argv[])
     rknn_demo_init();
     rknn_ui_show();
     rknn_demo_deinit();
+    // PostQuitMessage(HWND_DESKTOP);
+    exit(0);
 }

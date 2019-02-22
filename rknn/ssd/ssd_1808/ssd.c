@@ -7,7 +7,6 @@
 #include "ssd.h"
 #include "ssd_post.h"
 #include "v4l2camera.h"
-#include "include/rknn_runtime.h"
 
 #define DEV_NAME      "/dev/video0"
 #define MODEL_NAME    "/usr/share/rknn_demo/ssd_inception_v2.rknn"
