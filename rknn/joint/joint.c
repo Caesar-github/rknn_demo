@@ -135,7 +135,7 @@ int joint_post(void *flag)
     float *group;
 
     while(*(int *)flag) {
-        rknn_msg_recv(&predictions, &output_classes, &width, &heigh, (void *)&group);
+        rknn_msg_recv((void *)&predictions, (void *)&output_classes, &width, &heigh, (void *)&group);
         send_count--;
         postProcessCPM(predictions, group, CPM_NUM);
         if (predictions)
@@ -178,7 +178,7 @@ int joint_run(void *flag)
             printf("rknn_query fail! ret=%d\n", status);
             return -1;
         }
-        print_rknn_tensor(&(input_attrs[i]));
+        // print_rknn_tensor(&(input_attrs[i]));
     }
 
     printf("output tensors:\n");
@@ -191,7 +191,7 @@ int joint_run(void *flag)
             printf("rknn_query fail! ret=%d\n", status);
             return -1;
         }
-        print_rknn_tensor(&(output_attrs[i]));
+        // print_rknn_tensor(&(output_attrs[i]));
     }
 
     printf("start camera run\n");

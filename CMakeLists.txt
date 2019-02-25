@@ -59,10 +59,6 @@ if(DEFINED ENABLE_FRG)
     rknn/frg/frg.c
     ui/frg/frg_ui.c
   )
-  set(RKNN_RES_FILES
-      rknn/frg/frgsdk_rk1808/model/align.rknn
-      rknn/frg/frgsdk_rk1808/model/detect.rknn
-      rknn/frg/frgsdk_rk1808/model/recognize.rknn)
   link_libraries("${CMAKE_SOURCE_DIR}/rknn/frg/frgsdk_rk1808/so_file/librkfacerecg.so"
                  "${CMAKE_SOURCE_DIR}/rknn/frg/frgsdk_rk1808/so_file/libopencv_core.so"
                  "${CMAKE_SOURCE_DIR}/rknn/frg/frgsdk_rk1808/so_file/libopencv_imgproc.so")
@@ -93,10 +89,6 @@ link_libraries("libfreetype.so")
 
 add_executable(rknn_demo ${RKNN_DEMO_SRC} ${RKNN_MODEL_SRC})
 
-if (RKNN_RES_FILES)
-install(FILES ${RKNN_RES_FILES} DESTINATION share/rknn_demo)
-endif()
-
 if (DEFINED ENABLE_FRG)
 install(FILES rknn/frg/frgsdk_rk1808/so_file/librkfacerecg.so DESTINATION lib)
 install(FILES rknn/frg/frgsdk_rk1808/so_file/libopencv_core.so
@@ -109,7 +101,12 @@ install(FILES rknn/frg/frgsdk_rk1808/box_priors.txt DESTINATION bin)
 install(FILES rknn/frg/start_rknn_frg.sh DESTINATION bin)
 endif()
 
-install(FILES minigui/MiniGUI.cfg DESTINATION ../etc)
+if (DEFINED MODEL_RESOURCE_FILES)
+separate_arguments(MODEL_RESOURCE_FILES)
+install(FILES ${MODEL_RESOURCE_FILES} DESTINATION share/rknn_demo)
+endif()
+
+install(FILES ${MINIGUI_CFG} DESTINATION ../etc RENAME MiniGUI.cfg)
 install(DIRECTORY minigui DESTINATION local/share)
 
 install(TARGETS rknn_demo RUNTIME DESTINATION bin)
