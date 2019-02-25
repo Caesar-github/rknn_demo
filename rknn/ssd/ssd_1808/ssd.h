@@ -33,7 +33,7 @@ struct ssd_group {
 
 int ssd_run(void *flag);
 int ssd_post(void *flag);
-int ssd_init(int arg);
+int ssd_init(char *name);
 int ssd_deinit();
 float ssd_get_fps();
 struct ssd_group* ssd_get_ssd_group();

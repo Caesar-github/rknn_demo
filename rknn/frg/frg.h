@@ -26,7 +26,7 @@ struct frg_group {
 
 int frg_run(void *flag);
 int frg_post(void *flag);
-int frg_init(int arg);
+int frg_init(char *name);
 int frg_deinit();
 float frg_get_fps();
 struct frg_group* frg_get_group();

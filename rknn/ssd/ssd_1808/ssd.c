@@ -7,8 +7,8 @@
 #include "ssd.h"
 #include "ssd_post.h"
 #include "v4l2camera.h"
+#include "device_name.h"
 
-#define DEV_NAME      "/dev/video0"
 #define MODEL_NAME    "/usr/share/rknn_demo/ssd_inception_v2.rknn"
 
 #define SRC_W         640
@@ -30,6 +30,7 @@ char *g_mem_buf;
 rknn_context ctx;
 struct ssd_group g_ssd_group[2];
 volatile int send_count;
+char *dev_name;
 
 extern int yuv_draw(char *src_ptr, int src_fd, int format,
 		    int src_w, int src_h);
@@ -217,10 +218,11 @@ int ssd_post(void *flag)
 int ssd_run(void *flag)
 {
     int status = 0;
-
-    // Init
     int model_len = 0;
-    unsigned char* model = load_model(MODEL_NAME, &model_len);
+    unsigned char* model;
+
+    model = load_model(MODEL_NAME, &model_len);
+
     status = rknn_init(&ctx, model, model_len, 0);
     if(status < 0) {
         printf("rknn_init fail! ret=%d\n", status);
@@ -263,7 +265,7 @@ int ssd_run(void *flag)
     }
 
     // Open Camera and Run
-    cameraRun(DEV_NAME, SRC_W, SRC_H, SRC_FPS, SRC_V4L2_FMT,
+    cameraRun(dev_name, SRC_W, SRC_H, SRC_FPS, SRC_V4L2_FMT,
               ssd_camera_callback, (int*)flag);
 
     printf("exit cameraRun\n");
@@ -279,8 +281,9 @@ int ssd_run(void *flag)
 }
 
 
-int ssd_init(int arg)
+int ssd_init(char *name)
 {
+    dev_name = name;
     rknn_msg_init();
     buffer_init(DST_W, DST_H, DST_BPP, &g_rga_buf_bo,
 		&g_rga_buf_fd);
