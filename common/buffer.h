@@ -1,7 +1,9 @@
 #ifndef __BUFFER_H__
 #define __BUFFER_H__
 
+#ifndef HAVE_RKNN_RUNTIME_H
 #include "rknn_runtime.h"
+#endif
 #include <rga/RgaApi.h>
 
 unsigned char *load_model(const char *filename, int *model_size);

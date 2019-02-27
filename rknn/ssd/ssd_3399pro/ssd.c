@@ -12,6 +12,8 @@
 #include "ssd.h"
 #include "ssd_post.h"
 #include "v4l2camera.h"
+
+#define HAVE_RKNN_RUNTIME_H
 #include "buffer.h"
 
 #define DEV_NAME      "/dev/video8"
