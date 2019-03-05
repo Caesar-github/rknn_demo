@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <getopt.h> /* getopt_long() */
 #include <sys/stat.h>
 #include <sys/time.h>
 
@@ -52,6 +53,7 @@ typedef int (*rknn_callback_t)(void *arg);
 static int g_run_flag = 1;
 static pthread_t g_run_tid = 0;
 static pthread_t g_post_tid = 0;
+char *dev_name;
 
 int rknn_reg_paint_callback(paint_callback_t func)
 {
@@ -161,17 +163,17 @@ int rknn_demo_init()
     rknn_callback_t post;
     rknn_callback_t run;
 #if ENABLE_SSD
-    ssd_init(0);
+    ssd_init(dev_name);
     post = ssd_post;
     run = ssd_run;
 #endif
 #if ENABLE_JOINT
-    joint_init(0);
+    joint_init(dev_name);
     post = joint_post;
     run = joint_run;
 #endif
 #if ENABLE_FRG
-    frg_init(0);
+    frg_init(dev_name);
     post = frg_post;
     run = frg_run;
 #endif
@@ -275,11 +277,65 @@ int rknn_ui_show()
     return 0;
 }
 
+static char cam_device[10] = "usb";
+
+void parse_args(int argc, char **argv)
+{
+   int c;
+   int digit_optind = 0;
+
+   while (1) {
+       int this_option_optind = optind ? optind : 1;
+       int option_index = 0;
+       static struct option long_options[] = {
+           {"device",    required_argument, 0, 'd' },
+           {"help",     no_argument,       0, 'p' },
+           {0,          0,                 0,  0  }
+       };
+
+       c = getopt_long(argc, argv, "d:p",
+           long_options, &option_index);
+       if (c == -1)
+           break;
+
+       switch (c) {
+       case 'd':
+	   strcpy(cam_device, optarg);
+           break;
+       case '?':
+       case 'p':
+           printf("Usage: %s to run rknn demo\n"
+                  "         --device, required, use usb camera or mipi camera\n",
+                  argv[0]);
+           exit(-1);
+
+       default:
+           printf("?? getopt returned character code 0%o ??\n", c);
+       }
+   }
+}
+
 int MiniGUIMain(int argc, const char* argv[])
 {
+    parse_args(argc, argv);
+    if (strcmp(cam_device, "usb") == 0) {
+	dev_name = get_device("uvc");
+	if (!dev_name) {
+            printf("do not get right video node, quit\n");
+            return -1;
+        }
+    }
+    if (strcmp(cam_device, "mipi") == 0) {
+        dev_name = get_device("rkisp");
+        if (!dev_name) {
+            printf("do not get right video node, quit\n");
+            return -1;
+        }
+    }
+
     rknn_demo_init();
     rknn_ui_show();
     rknn_demo_deinit();
-    // PostQuitMessage(HWND_DESKTOP);
+
     exit(0);
 }

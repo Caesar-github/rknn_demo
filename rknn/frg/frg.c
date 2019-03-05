@@ -35,6 +35,7 @@ static float g_fps;
 static bo_t g_rga_buf_bo;
 static int g_rga_buf_fd = -1;
 static char *g_mem_buf = NULL;
+char *dev_name;
 // static rknn_context ctx;
 // static volatile int send_count;
 
@@ -393,7 +394,7 @@ int frg_run(void *flag)
     }
 
     // Open Camera and Run
-    cameraRun(DEV_NAME, SRC_W, SRC_H, SRC_FPS, SRC_V4L2_FMT,
+    cameraRun(dev_name, SRC_W, SRC_H, SRC_FPS, SRC_V4L2_FMT,
               frg_camera_callback, (int*)flag);
     rknn_msg_send(NULL, NULL, 0, 0, NULL);
     usleep(1000 * 1000);
@@ -424,8 +425,9 @@ out:
 }
 
 
-int frg_init(int arg)
+int frg_init(char *name)
 {
+    dev_name = name;
     rknn_msg_init();
     buffer_init(DST_W, DST_H, DST_BPP, &g_rga_buf_bo,
 		&g_rga_buf_fd);

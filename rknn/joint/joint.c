@@ -9,7 +9,6 @@
 #include "joint_post.h"
 #include "v4l2camera.h"
 
-#define DEV_NAME      "/dev/video0"
 #define MODEL_NAME    "/usr/share/rknn_demo/cpm.rknn"
 
 #define SRC_W         640
@@ -32,6 +31,7 @@ char *g_mem_buf;
 rknn_context ctx;
 float cpm_result[CPM_NUM * 2];
 volatile int send_count;
+char *dev_name;
 
 extern
 int yuv_draw(char *src_ptr, int src_fd, int format, int src_w, int src_h);
@@ -149,10 +149,10 @@ int joint_post(void *flag)
 int joint_run(void *flag)
 {
     int status = 0;
-
-    // Init
     int model_len = 0;
-    unsigned char* model = load_model(MODEL_NAME, &model_len);
+    unsigned char* model;
+
+    model = load_model(MODEL_NAME, &model_len);
     status = rknn_init(&ctx, model, model_len, 0);
     if(status < 0) {
         printf("rknn_init fail! ret=%d\n", status);
@@ -197,7 +197,7 @@ int joint_run(void *flag)
     printf("start camera run\n");
 
  // Open Camera and Run
-    cameraRun(DEV_NAME, SRC_W, SRC_H, SRC_FPS, SRC_V4L2_FMT,
+    cameraRun(dev_name, SRC_W, SRC_H, SRC_FPS, SRC_V4L2_FMT,
               joint_camera_callback, (int*)flag);
     printf("exit camera run\n");
 
@@ -212,8 +212,9 @@ int joint_run(void *flag)
     return status;
 }
 
-int joint_init(int arg)
+int joint_init(char *name)
 {
+    dev_name = name;
     rknn_msg_init();
     buffer_init(DST_W, DST_H, DST_BPP, &g_rga_buf_bo,
 		&g_rga_buf_fd);
