@@ -5,7 +5,7 @@
 
 #define IMAGE_NAME_LEN 30
 #define RES_PATH "/usr/local/share/minigui/res/images/"
-char dot_joint[][IMAGE_NAME_LEN] =          {"dot_joint .png"};
+char dot_joint[][IMAGE_NAME_LEN] =          {"dot_joint.png"};
 char dot_mobilenet[][IMAGE_NAME_LEN] =      {"dot_mobilenet.png"};
 char dot_ssd[][IMAGE_NAME_LEN] =            {"dot_ssd.png"};
 char fps_bg_9[][IMAGE_NAME_LEN] =           {"fps_bg.9.png"};
