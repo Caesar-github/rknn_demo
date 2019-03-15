@@ -29,7 +29,8 @@ int g_rga_buf_fd;
 char *g_mem_buf;
 rknn_context ctx;
 struct ssd_group g_ssd_group[2];
-volatile int send_count;
+volatile int send_count = 0;
+volatile int recv_count = 0;
 char *dev_name;
 
 extern int yuv_draw(char *src_ptr, int src_fd, int format,
@@ -161,14 +162,16 @@ int ssd_rknn_process(char* in_data, int w, int h, int c)
     long runTime2 = getCurrentTime();
     // printf("rknn run time:%0.2ldms\n", runTime2 - runTime1);
 
-    long postprocessTime1 = getCurrentTime();
-    rknn_msg_send((void *)output1, (void *)output0, w, h, &g_ssd_group[!cur_group]);
-    while(send_count >= 5) {
+    // long postprocessTime1 = getCurrentTime();
+    int ret = rknn_msg_send((void *)output1, (void *)output0, w, h, &g_ssd_group[!cur_group]);
+    if (ret)
+        return -1;
+    while(send_count - recv_count >= 5) {
         printf("sleep now \n");
         usleep(2000);
     }
-    long postprocessTime2 = getCurrentTime();
     send_count++;
+    // long postprocessTime2 = getCurrentTime();
     // printf("post process time:%0.2ldms\n", postprocessTime2 - postprocessTime1);
 }
 
@@ -192,8 +195,8 @@ int ssd_post(void *flag)
     struct ssd_group *group;
 
     while(*(int *)flag) {
-        rknn_msg_recv((void **)&predictions, (void **)&output_classes, &width, &heigh, (void *)&group);
-        send_count--;
+        if (!rknn_msg_recv((void **)&predictions, (void **)&output_classes, &width, &heigh, (void *)&group))
+            recv_count++;
         group = &g_ssd_group[!cur_group];
         // if (group->count > 0 && group->posted > 0)
         // {
