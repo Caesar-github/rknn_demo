@@ -317,6 +317,8 @@ void parse_args(int argc, char **argv)
 
 int MiniGUIMain(int argc, const char* argv[])
 {
+    struct stat st;
+
     parse_args(argc, argv);
     if (strcmp(cam_device, "usb") == 0) {
 	dev_name = get_device("uvc");
@@ -331,6 +333,13 @@ int MiniGUIMain(int argc, const char* argv[])
             printf("do not get right video node, quit\n");
             return -1;
         }
+    }
+    if (strcmp(cam_device, "file") == 0) {
+	dev_name = "/usr/local/share/rknn_demo/resource/test_image.nv12";
+	if (-1 == stat(dev_name, &st)) {
+		fprintf(stderr, "Cannot identify '%s': %d, %s\n", dev_name, errno, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
     }
 
     rknn_demo_init();

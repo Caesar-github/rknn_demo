@@ -110,5 +110,6 @@ endif()
 
 install(FILES ${MINIGUI_CFG} DESTINATION ../etc RENAME MiniGUI.cfg)
 install(DIRECTORY minigui DESTINATION local/share)
+install(DIRECTORY resource DESTINATION local/share/rknn_demo)
 
 install(TARGETS rknn_demo RUNTIME DESTINATION bin)

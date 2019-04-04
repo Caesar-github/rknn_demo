@@ -110,7 +110,16 @@ static int continuous = 1;
 static unsigned char jpegQuality = 70;
 static char* jpegFilename = NULL;
 static char* jpegFilenamePart = NULL;
+
 static char* deviceName = "/dev/video0";
+
+enum SourceType {
+	SOURCE_NONE = -1,
+	SOURCE_CAMERA,
+	SOURCE_FILE
+};
+
+static enum SourceType sourceType = SOURCE_NONE;
 
 static const char* const continuousFilenameFmt = "%s_%010"PRIu32"_%"PRId64".jpg";
 
@@ -346,6 +355,7 @@ static void mainLoop(camera_callback_t callback, int *flag)
 {
 	int count;
 	unsigned int numberOfTimeouts;
+	void *file_buffer = NULL;
 
 	numberOfTimeouts = 0;
 
@@ -353,42 +363,68 @@ static void mainLoop(camera_callback_t callback, int *flag)
 		fd_set fds;
 		struct timeval tv;
 		int r;
+		switch (sourceType) {
+		case SOURCE_CAMERA:
+			FD_ZERO(&fds);
+			FD_SET(fd, &fds);
 
-		FD_ZERO(&fds);
-		FD_SET(fd, &fds);
+			/* Timeout. */
+			tv.tv_sec = 1;
+			tv.tv_usec = 0;
 
-		/* Timeout. */
-		tv.tv_sec = 1;
-		tv.tv_usec = 0;
+			r = select(fd + 1, &fds, NULL, NULL, &tv);
 
-		r = select(fd + 1, &fds, NULL, NULL, &tv);
+			if (-1 == r) {
+				if (EINTR == errno)
+					break;
 
-		if (-1 == r) {
-			if (EINTR == errno)
-				continue;
-
-			errno_exit("select");
-		}
-
-		if (0 == r) {
-			if (numberOfTimeouts <= 0) {
-				count++;
-			} else {
-				fprintf(stderr, "select timeout\n");
-				exit(EXIT_FAILURE);
+				errno_exit("select");
 			}
-		}
-		if(continuous == 1) {
-			count = 3;
-		}
 
-		frameRead(callback);
-		/* EAGAIN - continue select loop. */
+			if (0 == r) {
+				if (numberOfTimeouts <= 0) {
+					count++;
+				} else {
+					fprintf(stderr, "select timeout\n");
+					exit(EXIT_FAILURE);
+				}
+			}
+			if(continuous == 1) {
+				count = 3;
+			}
 
+			frameRead(callback);
+			/* EAGAIN - continue select loop. */
+			break;
+		case SOURCE_FILE:
+			if (!file_buffer) {
+				size_t expect_size = width * height * 3 / 2;
+				file_buffer = malloc(expect_size);
+				if (!file_buffer)
+					errno_exit("malloc");
+				if (read(fd, file_buffer, expect_size) != expect_size)
+					errno_exit("read");
+			}
+			do {
+				struct timespec ts;
+				struct timeval timestamp;
+				clock_gettime(CLOCK_MONOTONIC, &ts);
+				timestamp.tv_sec = ts.tv_sec;
+				timestamp.tv_usec = ts.tv_nsec / 1000;
+
+				imageProcess(file_buffer, timestamp, callback);
+				usleep(40 * 1000);
+			} while (0);
+			break;
+		default:
+			break;
+		}
 		if (continuous == 0) {
 			*flag = 0;
 		}
 	}
+	if (file_buffer)
+		free(file_buffer);
 }
 
 /**
@@ -397,6 +433,9 @@ static void mainLoop(camera_callback_t callback, int *flag)
 static void captureStop(void)
 {
 	enum v4l2_buf_type type;
+
+	if (sourceType != SOURCE_CAMERA)
+		return;
 
 	switch (io) {
 #ifdef IO_READ
@@ -429,6 +468,9 @@ static void captureStart(void)
 {
 	unsigned int i;
 	enum v4l2_buf_type type;
+
+	if (sourceType != SOURCE_CAMERA)
+		return;
 
 	switch (io) {
 #ifdef IO_READ
@@ -491,6 +533,9 @@ static void captureStart(void)
 static void deviceUninit(void)
 {
 	unsigned int i;
+
+	if (sourceType != SOURCE_CAMERA)
+		return;
 
 	switch (io) {
 #ifdef IO_READ
@@ -683,6 +728,9 @@ static void deviceInit(void)
 	struct v4l2_streamparm frameint;
 	unsigned int min;
 
+	if (sourceType != SOURCE_CAMERA)
+		return;
+
 	if (-1 == xioctl(fd, VIDIOC_QUERYCAP, &cap)) {
 		if (EINVAL == errno) {
 			fprintf(stderr, "%s is no V4L2 device\n",deviceName);
@@ -870,7 +918,10 @@ static void deviceInit(void)
 */
 static void deviceClose(void)
 {
-	if (-1 == v4l2_close(fd))
+	if (sourceType == SOURCE_CAMERA && -1 == v4l2_close(fd))
+		errno_exit("close");
+
+	if (sourceType == SOURCE_FILE && close(fd))
 		errno_exit("close");
 
 	fd = -1;
@@ -889,14 +940,19 @@ static void deviceOpen(void)
 		exit(EXIT_FAILURE);
 	}
 
-	// check if its device
-	if (!S_ISCHR(st.st_mode)) {
-		fprintf(stderr, "%s is no device\n", deviceName);
-		exit(EXIT_FAILURE);
+	if (S_ISCHR(st.st_mode)) {
+		// open device
+		sourceType = SOURCE_CAMERA;
+		fd = v4l2_open(deviceName, O_RDWR /* required */ | O_NONBLOCK, 0);
+	} else if (S_ISREG(st.st_mode)) {
+		sourceType = SOURCE_FILE;
+		fd = open(deviceName, O_RDONLY | O_CLOEXEC);
 	}
 
-	// open device
-	fd = v4l2_open(deviceName, O_RDWR /* required */ | O_NONBLOCK, 0);
+	if (sourceType == SOURCE_NONE) {
+		fprintf(stderr, "%s is not device or file\n", deviceName);
+		exit(EXIT_FAILURE);
+	}
 
 	// check if opening was successfull
 	if (-1 == fd) {
@@ -1001,6 +1057,7 @@ int cameraRun(char *dev_name, unsigned int input_w, unsigned int input_h,
 			  camera_callback_t callback, int *flag)
 {
 	deviceName = dev_name;
+
 	io = IO_METHOD_MMAP;
 
 	width = input_w;
