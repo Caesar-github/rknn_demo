@@ -88,6 +88,7 @@ link_libraries("libpthread.so")
 link_libraries("librga.so")
 link_libraries("libfreetype.so")
 link_libraries("librkisp.so")
+link_libraries("librkuvc.so")
 
 add_executable(rknn_demo ${RKNN_DEMO_SRC} ${RKNN_MODEL_SRC})
 

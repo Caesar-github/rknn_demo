@@ -121,6 +121,12 @@ enum SourceType {
 
 static enum SourceType sourceType = SOURCE_NONE;
 
+callback_for_uvc cb_for_uvc = NULL;
+void register_callback_for_uvc(callback_for_uvc cb)
+{
+    cb_for_uvc = cb;
+}
+
 static const char* const continuousFilenameFmt = "%s_%010"PRIu32"_%"PRId64".jpg";
 
 /* isp relate defined */
@@ -303,6 +309,8 @@ static int frameRead(camera_callback_t callback)
 
 			assert(buf.index < n_buffers);
 			imageProcess(buffers[buf.index].start, buf.timestamp, callback);
+			if (cb_for_uvc)
+				cb_for_uvc(buffers[buf.index].start, buf.bytesused);
 			//usleep(60000);
 
 			if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))

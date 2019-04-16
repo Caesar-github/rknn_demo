@@ -24,6 +24,10 @@
 #include "rknn_msg.h"
 #include "ui_res.h"
 
+#include <uvc/uvc_control.h>
+#include <uvc/uvc_video.h>
+#include <uvc/mpi_enc.h>
+
 #if ENABLE_SSD
 #include "ssd.h"
 #include "ssd_ui.h"
@@ -179,10 +183,16 @@ int rknn_demo_init()
 #endif
     rknn_post_pth_create(post);
     rknn_run_pth_create(run);
+    if (!check_uvc_video_id()) {
+        mpi_enc_set_format(MPP_FMT_YUV420P);
+        add_uvc_video();
+        register_callback_for_uvc(uvc_read_camera_buffer);
+    }
 }
 
 int rknn_demo_deinit()
 {
+    uvc_video_id_exit_all();
 #if ENABLE_SSD
     ssd_deinit();
 #endif
