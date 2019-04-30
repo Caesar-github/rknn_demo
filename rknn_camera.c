@@ -320,21 +320,14 @@ int MiniGUIMain(int argc, const char* argv[])
     struct stat st;
 
     parse_args(argc, argv);
-    if (strcmp(cam_device, "usb") == 0) {
+    if (strcmp(cam_device, "usb") == 0)
 	dev_name = get_device("uvc");
-	if (!dev_name) {
-            printf("do not get right video node, quit\n");
-            return -1;
-        }
-    }
-    if (strcmp(cam_device, "mipi") == 0) {
+
+    if (strcmp(cam_device, "mipi") == 0)
         dev_name = get_device("rkisp");
-        if (!dev_name) {
-            printf("do not get right video node, quit\n");
-            return -1;
-        }
-    }
-    if (strcmp(cam_device, "file") == 0) {
+
+    if (!dev_name) {
+	printf("do not get usb camera or mipi camera vide node, use image to run rknn_demo\n");
 	dev_name = "/usr/local/share/rknn_demo/resource/test_image.nv12";
 	if (-1 == stat(dev_name, &st)) {
 		fprintf(stderr, "Cannot identify '%s': %d, %s\n", dev_name, errno, strerror(errno));
