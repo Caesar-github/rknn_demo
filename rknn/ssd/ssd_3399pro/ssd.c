@@ -16,7 +16,7 @@
 #define HAVE_RKNN_RUNTIME_H
 #include "buffer.h"
 
-#define DEV_NAME      "/dev/video8"
+#define DEV_NAME      "/dev/video10"
 #define MODEL_NAME    "/usr/share/rknn_demo/mobilenet_ssd.rknn"
 
 #define SRC_W         640
