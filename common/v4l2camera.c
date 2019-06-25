@@ -144,26 +144,6 @@ static char iq_file[255] = "/etc/cam_iq.xml";
 #define LIBRKISP "/usr/lib/librkisp.so"
 
 /**
-SIGINT interput handler
-*/
-void StopContCapture(int sig_id) {
-	printf("stoping continuous capture\n");
-	continuous = 0;
-}
-
-void InstallSIGINTHandler() {
-	struct sigaction sa;
-	CLEAR(sa);
-
-	sa.sa_handler = StopContCapture;
-	if(sigaction(SIGINT, &sa, 0) != 0)
-	{
-		fprintf(stderr,"could not install SIGINT handler, continuous capture disabled");
-		continuous = 0;
-	}
-}
-
-/**
 	Print error message and terminate programm with EXIT_FAILURE return code.
 
 	\param s error message to print
@@ -427,8 +407,8 @@ static void mainLoop(camera_callback_t callback, int *flag)
 		default:
 			break;
 		}
-		if (continuous == 0) {
-			*flag = 0;
+		if (*flag == 0) {
+		         break;
 		}
 	}
 	if (file_buffer)
@@ -1072,7 +1052,6 @@ int cameraRun(char *dev_name, unsigned int input_w, unsigned int input_h,
 	height = input_h;
 	fps = cam_fps;
 	format = cam_format;
-	InstallSIGINTHandler();
 
 	// open and initialize device
 	deviceOpen();
