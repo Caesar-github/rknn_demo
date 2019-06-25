@@ -108,7 +108,6 @@ int ssd_rknn_process(char* in_data, int w, int h, int c)
     float *out_data0 = NULL;
     float *out_data1 = NULL;
   //   printf("camera callback w=%d h=%d c=%d\n", w, h, c);
-    cal_fps(&g_fps);
 
     long runTime1 = getCurrentTime();
 
@@ -175,15 +174,19 @@ int ssd_rknn_process(char* in_data, int w, int h, int c)
     // printf("post process time:%0.2ldms\n", postprocessTime2 - postprocessTime1);
 }
 
-void ssd_camera_callback(void *p, int w, int h)
+void ssd_camera_callback(void *p, int w, int h, int *flag)
 {
     unsigned char* srcbuf = (unsigned char *)p;
     // Send camera data to minigui layer
     yuv_draw(srcbuf, 0, SRC_RKRGA_FMT, w, h);
-    YUV420toRGB24_RGA(SRC_RKRGA_FMT, srcbuf, w, h,
-                      DST_RKRGA_FMT, g_rga_buf_fd, DST_W, DST_H);
-    memcpy(g_mem_buf, g_rga_buf_bo.ptr, DST_W * DST_H * DST_BPP / 8);
-    ssd_rknn_process(g_mem_buf, DST_W, DST_H, DST_BPP);
+    cal_fps(&g_fps);
+
+    if (*flag) {
+	YUV420toRGB24_RGA(SRC_RKRGA_FMT, srcbuf, w, h,
+			DST_RKRGA_FMT, g_rga_buf_fd, DST_W, DST_H);
+	memcpy(g_mem_buf, g_rga_buf_bo.ptr, DST_W * DST_H * DST_BPP / 8);
+	ssd_rknn_process(g_mem_buf, DST_W, DST_H, DST_BPP);
+    }
 }
 
 int ssd_post(void *flag)

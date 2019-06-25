@@ -245,14 +245,14 @@ static void jpegWrite(unsigned char* img, char* jpegFilename)
 	fclose(outfile);
 }
 
-static void imageProcess(void *p, struct timeval time, camera_callback_t callback)
+static void imageProcess(void *p, struct timeval time, camera_callback_t callback, int *flag)
 {
 	// Out input h/w maybe can't fit uvc device, so there maybe changed.
 	if (callback)
-		callback(p, width, height);
+		callback(p, width, height, flag);
 }
 
-static int frameRead(camera_callback_t callback)
+static int frameRead(camera_callback_t callback, int *flag)
 {
 	struct v4l2_buffer buf;
 #ifdef IO_USERPTR
@@ -282,7 +282,7 @@ static int frameRead(camera_callback_t callback)
 			timestamp.tv_sec = ts.tv_sec;
 			timestamp.tv_usec = ts.tv_nsec/1000;
 
-			imageProcess(buffers[0].start, timestamp, callback);
+			imageProcess(buffers[0].start, timestamp, callback, flag);
 			break;
 #endif
 
@@ -308,7 +308,7 @@ static int frameRead(camera_callback_t callback)
 			}
 
 			assert(buf.index < n_buffers);
-			imageProcess(buffers[buf.index].start, buf.timestamp, callback);
+			imageProcess(buffers[buf.index].start, buf.timestamp, callback, flag);
 			if (cb_for_uvc)
 				cb_for_uvc(buffers[buf.index].start, buf.bytesused);
 			//usleep(60000);
@@ -345,7 +345,7 @@ static int frameRead(camera_callback_t callback)
 
 				assert (i < n_buffers);
 
-				imageProcess((void *)buf.m.userptr, buf.timestamp, callback);
+				imageProcess((void *)buf.m.userptr, buf.timestamp, callback, flag);
 
 				if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
 					errno_exit("VIDIOC_QBUF");
@@ -367,7 +367,7 @@ static void mainLoop(camera_callback_t callback, int *flag)
 
 	numberOfTimeouts = 0;
 
-	while (*flag) {
+	while(1) {
 		fd_set fds;
 		struct timeval tv;
 		int r;
@@ -401,7 +401,7 @@ static void mainLoop(camera_callback_t callback, int *flag)
 				count = 3;
 			}
 
-			frameRead(callback);
+			frameRead(callback, flag);
 			/* EAGAIN - continue select loop. */
 			break;
 		case SOURCE_FILE:
@@ -420,7 +420,7 @@ static void mainLoop(camera_callback_t callback, int *flag)
 				timestamp.tv_sec = ts.tv_sec;
 				timestamp.tv_usec = ts.tv_nsec / 1000;
 
-				imageProcess(file_buffer, timestamp, callback);
+				imageProcess(file_buffer, timestamp, callback, flag);
 				usleep(40 * 1000);
 			} while (0);
 			break;

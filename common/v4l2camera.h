@@ -1,7 +1,7 @@
 #ifndef _V4L2CAMERA_H_
 #define _V4L2CAMERA_H_
 
-typedef void (*camera_callback_t)(void *in_data, int w, int h);
+typedef void (*camera_callback_t)(void *in_data, int w, int h, int *flag);
 typedef void (*callback_for_uvc)(void *buffer, size_t size);
 
 int cameraRun(char *dev_name, unsigned int input_w, unsigned int input_h,

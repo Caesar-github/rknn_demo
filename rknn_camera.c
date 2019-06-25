@@ -299,11 +299,12 @@ void parse_args(int argc, char **argv)
        int option_index = 0;
        static struct option long_options[] = {
            {"device",    required_argument, 0, 'd' },
+           {"nonenpu",  no_argument,       0, 'n' },
            {"help",     no_argument,       0, 'p' },
            {0,          0,                 0,  0  }
        };
 
-       c = getopt_long(argc, argv, "d:p",
+       c = getopt_long(argc, argv, "d:n:p",
            long_options, &option_index);
        if (c == -1)
            break;
@@ -312,6 +313,9 @@ void parse_args(int argc, char **argv)
        case 'd':
 	   strcpy(cam_device, optarg);
            break;
+       case 'n':
+	   g_run_flag = 0;
+	   break;
        case '?':
        case 'p':
            printf("Usage: %s to run rknn demo\n"
