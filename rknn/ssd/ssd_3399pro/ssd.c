@@ -29,7 +29,7 @@
 
 #define SRC_V4L2_FMT  V4L2_PIX_FMT_YUV420
 #define SRC_RKRGA_FMT RK_FORMAT_YCbCr_420_P
-#define DST_RKRGA_FMT RK_FORMAT_RGB_888
+#define DST_RKRGA_FMT RK_FORMAT_BGR_888
 
 float g_fps;
 bo_t g_rga_buf_bo;
