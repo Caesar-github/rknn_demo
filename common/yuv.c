@@ -58,8 +58,8 @@ int YUV420toRGB24(int width, int height, unsigned char* src, unsigned char* dst)
         return -1;
     const long len = width * height;
     unsigned char* yData = src;
-    unsigned char* vData = &yData[len];
-    unsigned char* uData = &vData[len >> 2];
+    unsigned char* uData = &yData[len];
+    unsigned char* vData = &uData[len >> 2];
 
     int bgr[3];
     int yIdx,uIdx,vIdx,idx;
